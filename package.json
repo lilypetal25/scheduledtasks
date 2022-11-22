@@ -2,11 +2,13 @@
   "name": "scheduledtasks",
   "version": "1.0.0",
   "description": "",
+  "type": "module",
   "scripts": {
     "start": "func start",
     "test": "echo \"No tests yet...\""
   },
   "dependencies": {
-    "18": "^0.0.0"
+    "18": "^0.0.0",
+    "got": "^12.5.3"
   }
 }
