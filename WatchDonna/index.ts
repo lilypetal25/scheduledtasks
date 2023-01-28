@@ -54,7 +54,7 @@ const timerTrigger: AzureFunction = async function (context: Context, myTimer: T
 
     newDates.forEach(x => context.log(`Found new date of service: ${x}`));
 
-    sendNewDatesNotification(newDates.map(x => new Date(x)));
+    await sendNewDatesNotification(newDates.map(x => new Date(x)));
 
     // Construct a new list of known dates, dropping any dates in the past and adding any new ones we discovered.
     const newKnownDates = new Set([
@@ -62,7 +62,7 @@ const timerTrigger: AzureFunction = async function (context: Context, myTimer: T
         ...newDates.values() // Include any newly discovered dates.
     ]);
 
-    persistKnownDates(context, blobClient, newKnownDates);
+    await persistKnownDates(context, blobClient, newKnownDates);
 };
 
 export default timerTrigger;
@@ -149,7 +149,7 @@ async function sendNewDatesNotification(newDates: Date[]): Promise<void> {
 
     const connectionString = process.env.SmsConnectionString;
     const from = process.env.SmsFromPhoneNumber;
-    const to = process.env.NewServiceDateSmsRecipients.split(/;,/i);
+    const to = process.env.NewServiceDateSmsRecipients.split(/[;,]/i);
     const message = formatNewServiceDateMessage(newDates);
 
     const smsClient = new SmsClient(connectionString);
