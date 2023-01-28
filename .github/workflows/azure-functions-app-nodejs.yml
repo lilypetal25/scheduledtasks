@@ -33,7 +33,6 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest # For Linux, use ubuntu-latest
-    environment: dev
     steps:
     - name: 'Checkout GitHub Action'
       uses: actions/checkout@v3
