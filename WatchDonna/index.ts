@@ -1,3 +1,4 @@
+import { SmsClient, SmsSendResult } from "@azure/communication-sms";
 import { AzureFunction, Context, Timer } from "@azure/functions"
 import { BlobServiceClient, BlockBlobClient } from "@azure/storage-blob";
 import got from "got";
@@ -52,6 +53,8 @@ const timerTrigger: AzureFunction = async function (context: Context, myTimer: T
     }
 
     newDates.forEach(x => context.log(`Found new date of service: ${x}`));
+
+    sendNewDatesNotification(newDates.map(x => new Date(x)));
 
     // Construct a new list of known dates, dropping any dates in the past and adding any new ones we discovered.
     const newKnownDates = new Set([
@@ -129,4 +132,57 @@ function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
       });
       stream.on("error", reject);
     });
-  }
+}
+
+async function sendNewDatesNotification(newDates: Date[]): Promise<void> {
+    if (!process.env.SmsConnectionString) {
+        throw "SmsConnectionString is not defined.";
+    }
+
+    if (!process.env.SmsFromPhoneNumber) {
+        throw "SmsFromPhoneNumber is not defined.";
+    }
+
+    if (!process.env.NewServiceDateSmsRecipients) {
+        throw "NewServiceDateSmsRecipients is not defined";
+    }
+
+    const connectionString = process.env.SmsConnectionString;
+    const from = process.env.SmsFromPhoneNumber;
+    const to = process.env.NewServiceDateSmsRecipients.split(/;,/i);
+    const message = formatNewServiceDateMessage(newDates);
+
+    const smsClient = new SmsClient(connectionString);
+    const results = await smsClient.send({ from, to, message });
+
+    const failedResults = results.filter(x => !x.successful);
+
+    if (failedResults.length > 0) {
+        throw `Failed to send new dates SMS message: \n${failedResults.map(formatDeliveryFailedError).join('\n')}`;
+    }
+}
+
+function formatNewServiceDateMessage(newDates: Date[]): string {
+    // Ensure dates are sorted from earliest to latest.
+    newDates.sort((a, b) => a.getTime() - b.getTime());
+
+    // Make a list of lines of text representing the dates.
+    const newDateListLines = newDates.map(formatDateForSmsMessage).map(x => `  - ${x}`);
+
+    // If there are more than 5 dates truncate the list by summarizing the middle entries.
+    if (newDateListLines.length > 5) {
+        const othersCount = newDates.length - 4;
+        const summaryText = `  - ${othersCount} others...`;
+        newDateListLines.splice(3, othersCount, summaryText);
+    }
+
+    return `Awooga, awooga! Donna opened up appointments on ${newDates.length} new date(s): \n${newDateListLines.join('\n')}`;
+}
+
+function formatDeliveryFailedError({ to, httpStatusCode, errorMessage }: SmsSendResult) {
+    return `Attempt to send message to ${to} failed with HTTP status code ${httpStatusCode}: ${errorMessage || '<no error message>'}`;
+}
+
+function formatDateForSmsMessage(date: Date): string {
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' });
+}
